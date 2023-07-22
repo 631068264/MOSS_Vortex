@@ -108,7 +108,7 @@ DEFAULT_PARAS = {
                 "prefix_length":len(PREFIX)
                 }
 
-MODEL_DIR = "fnlp/moss-moon-003-sft-plugin-int4"
+MODEL_DIR = "model/moss-moon-003-sft-plugin"
 
 
 class My_WebSocket():
@@ -181,7 +181,7 @@ def Local_Init_AutoTokenizer(model_dir) -> PreTrainedTokenizer:
     # Uncomment the following lines to load tokenizer from different sources.
 
     # Load the tokenizer from local files.
-    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+    tokenizer = AutoTokenizer.from_pretrained(model_dir,trust_remote_code=True)
 
     return tokenizer
 
@@ -345,7 +345,7 @@ class Preprocess(Worker):
 class Inference(Worker):
     """Pytorch Inference class"""
 
-    def __init__(self, use_onnx=True):
+    def __init__(self, use_onnx=False):
         """
         Initialize the model.
 
@@ -367,7 +367,7 @@ class Inference(Worker):
             self.ort_session = ort.InferenceSession(self.model_path, ort.SessionOptions(),providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
         else:
             logger.info("[MOSEC] [INIT] PyTorch Loading")
-            self.model = AutoModelForCausalLM.from_pretrained(self.model_path, local_files_only=True).cuda()
+            self.model = AutoModelForCausalLM.from_pretrained(self.model_path, local_files_only=True,trust_remote_code=True).cuda()
             self.model.to(self.device)
 
         self.num_layers, self.heads, self.hidden, self.vocab_size = 34, 24, 256, 107008
@@ -866,8 +866,9 @@ class Inference(Worker):
         return data.encode("utf-8")
 
 if __name__ == "__main__":
-    
-    NUM_DEVICE = 6
+    print(torch.cuda.is_available())
+    print(torch.cuda.device_count())
+    NUM_DEVICE = 1
 
     def _get_cuda_device(cid: int) -> dict:
         """
@@ -890,7 +891,7 @@ if __name__ == "__main__":
     # Append inference worker to the server.
     server.append_worker(Inference,
                          num=NUM_DEVICE,
-                         env=[_get_cuda_device(x) for x in range(0, 0+NUM_DEVICE)],  # env=[{"CUDA_VISIBLE_DEVICES":"7"}],
+                         env=[_get_cuda_device(1)],  # env=[{"CUDA_VISIBLE_DEVICES":"7"}],
                          max_batch_size=INFERENCE_BATCH_SIZE,
                         )
     # Run the server.
